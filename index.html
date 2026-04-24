@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Карта — офлайн</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-brand">
+        <span class="header-mark" aria-hidden="true"></span>
+        <div class="header-titles">
+          <h1 class="header-title">Battle Map</h1>
+          <p class="header-sub">Локальные тайлы · без сети</p>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span id="zoomReadout" class="readout">z —</span>
+        <span id="scaleReadout" class="readout readout-muted">scale —</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <aside class="points-panel" aria-label="Список точек">
+        <h2 class="points-title">Точки на карте</h2>
+        <div id="pointsList" class="points-list"></div>
+      </aside>
+
+      <section class="map-shell">
+        <div id="map" class="map" aria-label="Карта из локальных тайлов">
+          <div id="tilesBase" class="tiles-layer"></div>
+          <div id="tilesIncoming" class="tiles-layer tiles-layer--incoming" aria-hidden="true"></div>
+          <div id="pointsLayer" class="points-layer" aria-hidden="true"></div>
+          <div class="map-frame" aria-hidden="true"></div>
+          <div class="map-vignette" aria-hidden="true"></div>
+        </div>
+
+        <aside class="hud" aria-label="Управление картой">
+          <button type="button" id="zoomInBtn" class="hud-btn" title="Приблизить">+</button>
+          <button type="button" id="zoomOutBtn" class="hud-btn" title="Отдалить">−</button>
+          <button type="button" id="resetBtn" class="hud-btn hud-btn--ghost" title="Сбросить вид">⟲</button>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <script src="./tile-manifest.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
