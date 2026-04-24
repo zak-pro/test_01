@@ -487,20 +487,13 @@ body {
   }
 
   .hud {
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    gap: 10px;
-  }
-
-  .hud-btn {
-    width: 52px;
-    height: 48px;
-    font-size: 1.35rem;
+    display: none;
   }
 
   .cursor-coords {
-    font-size: 12px;
-    padding: 6px 10px;
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 
   .map-point-label {
