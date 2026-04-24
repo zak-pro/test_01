@@ -23,12 +23,16 @@
     </header>
 
     <main class="main">
-      <aside id="pointsPanel" class="points-panel" aria-label="Список точек">
+      <aside id="pointsPanel" class="points-panel points-sheet" aria-label="Список точек">
         <h2 class="points-title">Точки на карте</h2>
         <div id="pointsList" class="points-list"></div>
       </aside>
 
       <section class="map-shell">
+        <div class="map-readouts map-readouts--mobile" aria-hidden="true">
+          <span id="zoomReadoutMobile" class="readout">z —</span>
+          <span id="scaleReadoutMobile" class="readout readout-muted">scale —</span>
+        </div>
         <div id="map" class="map" aria-label="Карта из локальных тайлов">
           <div id="tilesBase" class="tiles-layer"></div>
           <div id="tilesIncoming" class="tiles-layer tiles-layer--incoming" aria-hidden="true"></div>
@@ -45,6 +49,8 @@
         </aside>
       </section>
     </main>
+
+    <div id="pointsSheetBackdrop" class="points-sheet-backdrop" aria-hidden="true"></div>
 
     <button
       type="button"

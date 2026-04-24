@@ -16,6 +16,9 @@
   const tilesIncomingEl = document.getElementById("tilesIncoming");
   const zoomReadout = document.getElementById("zoomReadout");
   const scaleReadout = document.getElementById("scaleReadout");
+  const zoomReadoutMobile = document.getElementById("zoomReadoutMobile");
+  const scaleReadoutMobile = document.getElementById("scaleReadoutMobile");
+  const pointsSheetBackdrop = document.getElementById("pointsSheetBackdrop");
   const zoomInBtn = document.getElementById("zoomInBtn");
   const zoomOutBtn = document.getElementById("zoomOutBtn");
   const resetBtn = document.getElementById("resetBtn");
@@ -48,6 +51,8 @@
   let pointerDown = false;
   let panPointerId = -1;
   let panActive = false;
+  let pinchActive = false;
+  let pinchLastDist = 0;
   let dragStartClient = { x: 0, y: 0 };
   let dragStartCenter = { x: 0, y: 0 };
   let lastPivot = { x: 0, y: 0 };
@@ -94,10 +99,16 @@
       const open = mainEl.classList.contains("main--points-open");
       pointsPanelToggle.setAttribute("aria-expanded", open ? "true" : "false");
       pointsPanelToggle.textContent = open ? "Свернуть список" : "Точки на карте";
+      if (pointsSheetBackdrop) {
+        pointsSheetBackdrop.setAttribute("aria-hidden", open ? "false" : "true");
+      }
     } else {
       mainEl.classList.remove("main--points-open");
       pointsPanelToggle.setAttribute("aria-expanded", "true");
       pointsPanelToggle.textContent = "Точки на карте";
+      if (pointsSheetBackdrop) {
+        pointsSheetBackdrop.setAttribute("aria-hidden", "true");
+      }
     }
   }
 
@@ -285,8 +296,20 @@
   }
 
   function updateReadouts() {
-    zoomReadout.textContent = `z ${z}`;
-    scaleReadout.textContent = `×${displayScale.toFixed(3)}`;
+    const zt = `z ${z}`;
+    const st = `×${displayScale.toFixed(3)}`;
+    if (zoomReadout) {
+      zoomReadout.textContent = zt;
+    }
+    if (scaleReadout) {
+      scaleReadout.textContent = st;
+    }
+    if (zoomReadoutMobile) {
+      zoomReadoutMobile.textContent = zt;
+    }
+    if (scaleReadoutMobile) {
+      scaleReadoutMobile.textContent = st;
+    }
   }
 
   function buildListItem(idx, wx, wy) {
@@ -697,13 +720,8 @@
     });
   }
 
-  function applyWheelDelta(deltaY, px, py) {
-    if (zTransition) {
-      return;
-    }
-    if (deltaY < 0) {
-      clearOutTierCooldown();
-    } else if (outTierCooldown && deltaY > 0) {
+  function applyZoomScaleFactor(factor, px, py) {
+    if (zTransition || !Number.isFinite(factor) || factor <= 0) {
       return;
     }
     measure();
@@ -711,7 +729,6 @@
       return;
     }
 
-    const factor = Math.exp(-deltaY * WHEEL_EXP_FACTOR);
     const nextScale = displayScale * factor;
 
     if (nextScale >= SCALE_MAX && z < maxZ) {
@@ -739,6 +756,19 @@
     displayScale = clamped;
     clampCenter();
     renderBase();
+  }
+
+  function applyWheelDelta(deltaY, px, py) {
+    if (zTransition) {
+      return;
+    }
+    if (deltaY < 0) {
+      clearOutTierCooldown();
+    } else if (outTierCooldown && deltaY > 0) {
+      return;
+    }
+    const factor = Math.exp(-deltaY * WHEEL_EXP_FACTOR);
+    applyZoomScaleFactor(factor, px, py);
   }
 
   function flushWheel() {
@@ -782,10 +812,104 @@
     { passive: false }
   );
 
+  function cancelPanForPinch() {
+    if (!pointerDown) {
+      return;
+    }
+    const capId = panPointerId;
+    pointerDown = false;
+    panPointerId = -1;
+    panActive = false;
+    lastPanSampleTs = 0;
+    mapEl.classList.remove("is-dragging", "is-pan-press");
+    if (capId >= 0) {
+      try {
+        mapEl.releasePointerCapture(capId);
+      } catch {
+        /* noop */
+      }
+    }
+  }
+
+  mapEl.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+      pinchActive = false;
+      pinchLastDist = 0;
+    }
+  });
+
+  mapEl.addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.touches.length !== 2) {
+        return;
+      }
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      if (dist < 4) {
+        return;
+      }
+      e.preventDefault();
+      stopInertia();
+      if (!pinchActive) {
+        pinchActive = true;
+        pinchLastDist = dist;
+        cancelPanForPinch();
+        return;
+      }
+      const factor = dist / pinchLastDist;
+      if (!Number.isFinite(factor) || factor <= 0) {
+        return;
+      }
+      pinchLastDist = dist;
+      measure();
+      const r = mapEl.getBoundingClientRect();
+      const mx = (t0.clientX + t1.clientX) / 2 - r.left;
+      const my = (t0.clientY + t1.clientY) / 2 - r.top;
+      const px = Math.max(0, Math.min(mapW, mx));
+      const py = Math.max(0, Math.min(mapH, my));
+      if (factor > 1) {
+        clearOutTierCooldown();
+      } else if (outTierCooldown && factor < 1) {
+        return;
+      }
+      applyZoomScaleFactor(factor, px, py);
+    },
+    { passive: false }
+  );
+
+  mapEl.addEventListener("touchend", (e) => {
+    if (e.touches.length < 2) {
+      pinchActive = false;
+      pinchLastDist = 0;
+    }
+  });
+
+  mapEl.addEventListener("touchcancel", (e) => {
+    if (e.touches.length < 2) {
+      pinchActive = false;
+      pinchLastDist = 0;
+    }
+  });
+
+  mapEl.addEventListener("gesturestart", (e) => {
+    e.preventDefault();
+  });
+  mapEl.addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+  });
+  mapEl.addEventListener("gestureend", (e) => {
+    e.preventDefault();
+  });
+
   mapEl.addEventListener("pointermove", (e) => {
     lastCursorClient = { x: e.clientX, y: e.clientY };
     refreshCursorCoordsOverlay();
     lastPivot = mapPivotFromClient(e.clientX, e.clientY);
+    if (pinchActive) {
+      return;
+    }
     if (!pointerDown || e.pointerId !== panPointerId) {
       return;
     }
@@ -878,6 +1002,13 @@
     }
     mainEl.classList.toggle("main--points-open");
     syncMobilePointsPanelUi();
+  });
+
+  pointsSheetBackdrop?.addEventListener("click", () => {
+    if (mainEl?.classList.contains("main--points-open")) {
+      mainEl.classList.remove("main--points-open");
+      syncMobilePointsPanelUi();
+    }
   });
 
   mobilePointsMedia.addEventListener("change", () => {
