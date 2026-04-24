@@ -21,6 +21,7 @@
   const resetBtn = document.getElementById("resetBtn");
   const pointsLayerEl = document.getElementById("pointsLayer");
   const pointsListEl = document.getElementById("pointsList");
+  const cursorCoordsEl = document.getElementById("cursorCoords");
 
   if (!mapEl || !tilesBaseEl || !tilesIncomingEl || !pointsLayerEl || !pointsListEl) {
     return;
@@ -59,6 +60,10 @@
 
   let outTierCooldown = false;
   let outTierCooldownTimer = null;
+
+  let cursorCoordsVisible = false;
+  let lastCursorClient = null;
+  const CURSOR_COORDS_OFFSET_Y = 18;
 
   function clearWheelQueue() {
     wheelAccum = 0;
@@ -192,6 +197,37 @@
       x: Math.max(0, Math.min(r.width, clientX - r.left)),
       y: Math.max(0, Math.min(r.height, clientY - r.top)),
     };
+  }
+
+  function refreshCursorCoordsOverlay() {
+    if (!cursorCoordsEl) {
+      return;
+    }
+    if (!cursorCoordsVisible || !lastCursorClient || zTransition) {
+      cursorCoordsEl.classList.remove("is-visible");
+      return;
+    }
+    const r = mapEl.getBoundingClientRect();
+    const cx = lastCursorClient.x;
+    const cy = lastCursorClient.y;
+    if (cx < r.left || cx >= r.right || cy < r.top || cy >= r.bottom) {
+      cursorCoordsEl.classList.remove("is-visible");
+      return;
+    }
+    measure();
+    if (mapW === 0 || mapH === 0) {
+      return;
+    }
+    const px = cx - r.left;
+    const py = cy - r.top;
+    const w = screenToWorld(px, py, center, displayScale);
+    const wMax = worldSize(z);
+    const wx = Math.max(0, Math.min(wMax, w.x));
+    const wy = Math.max(0, Math.min(wMax, w.y));
+    cursorCoordsEl.textContent = `${Math.round(wx)}, ${Math.round(wy)}`;
+    cursorCoordsEl.style.left = `${px}px`;
+    cursorCoordsEl.style.top = `${py + CURSOR_COORDS_OFFSET_Y}px`;
+    cursorCoordsEl.classList.add("is-visible");
   }
 
   function screenToWorld(px, py, c, s) {
@@ -478,6 +514,7 @@
     syncTileDatasetKeys(tilesBaseEl);
     updateReadouts();
     renderPoints();
+    refreshCursorCoordsOverlay();
   }
 
   function stopInertia() {
@@ -553,6 +590,7 @@
     syncTileDatasetKeys(tilesBaseEl);
     updateReadouts();
     renderPoints();
+    refreshCursorCoordsOverlay();
   }
 
   function beginZTransition(deltaZ, px, py, pivotScale) {
@@ -696,6 +734,18 @@
     wheelRaf = requestAnimationFrame(flushWheel);
   }
 
+  mapEl.addEventListener("pointerenter", (e) => {
+    cursorCoordsVisible = true;
+    lastCursorClient = { x: e.clientX, y: e.clientY };
+    refreshCursorCoordsOverlay();
+  });
+
+  mapEl.addEventListener("pointerleave", () => {
+    cursorCoordsVisible = false;
+    lastCursorClient = null;
+    refreshCursorCoordsOverlay();
+  });
+
   mapEl.addEventListener(
     "wheel",
     (e) => {
@@ -712,6 +762,8 @@
   );
 
   mapEl.addEventListener("pointermove", (e) => {
+    lastCursorClient = { x: e.clientX, y: e.clientY };
+    refreshCursorCoordsOverlay();
     lastPivot = mapPivotFromClient(e.clientX, e.clientY);
     if (!pointerDown) {
       return;
