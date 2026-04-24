@@ -1,11 +1,14 @@
-# Публикует статический сайт на GitHub Pages при push в main.
-# После первого push: Settings → Pages → Build: GitHub Actions.
+# Статический сайт на GitHub Pages.
+# Один раз в репозитории: Settings → Pages → Build and deployment → Source: «GitHub Actions»
+# (см. https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-with-a-custom-github-actions-workflow )
+# Шаг configure-pages убран: без включённого Pages он даёт 404 Get Pages site.
 
 name: Deploy GitHub Pages
 
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,11 +29,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
       - name: Upload site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: "."
 
