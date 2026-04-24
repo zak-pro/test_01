@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Карта — офлайн</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -23,7 +23,7 @@
     </header>
 
     <main class="main">
-      <aside class="points-panel" aria-label="Список точек">
+      <aside id="pointsPanel" class="points-panel" aria-label="Список точек">
         <h2 class="points-title">Точки на карте</h2>
         <div id="pointsList" class="points-list"></div>
       </aside>
@@ -45,6 +45,16 @@
         </aside>
       </section>
     </main>
+
+    <button
+      type="button"
+      id="pointsPanelToggle"
+      class="points-panel-toggle"
+      aria-controls="pointsPanel"
+      aria-expanded="false"
+    >
+      Точки на карте
+    </button>
   </div>
 
   <script src="./tile-manifest.js"></script>

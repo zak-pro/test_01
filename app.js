@@ -22,6 +22,9 @@
   const pointsLayerEl = document.getElementById("pointsLayer");
   const pointsListEl = document.getElementById("pointsList");
   const cursorCoordsEl = document.getElementById("cursorCoords");
+  const mainEl = document.querySelector(".main");
+  const pointsPanelToggle = document.getElementById("pointsPanelToggle");
+  const mobilePointsMedia = window.matchMedia("(max-width: 768px)");
 
   if (!mapEl || !tilesBaseEl || !tilesIncomingEl || !pointsLayerEl || !pointsListEl) {
     return;
@@ -43,6 +46,7 @@
   let cacheTick = 0;
 
   let pointerDown = false;
+  let panPointerId = -1;
   let panActive = false;
   let dragStartClient = { x: 0, y: 0 };
   let dragStartCenter = { x: 0, y: 0 };
@@ -78,6 +82,22 @@
     if (outTierCooldownTimer) {
       clearTimeout(outTierCooldownTimer);
       outTierCooldownTimer = null;
+    }
+  }
+
+  function syncMobilePointsPanelUi() {
+    if (!mainEl || !pointsPanelToggle) {
+      return;
+    }
+    const narrow = mobilePointsMedia.matches;
+    if (narrow) {
+      const open = mainEl.classList.contains("main--points-open");
+      pointsPanelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      pointsPanelToggle.textContent = open ? "Свернуть список" : "Точки на карте";
+    } else {
+      mainEl.classList.remove("main--points-open");
+      pointsPanelToggle.setAttribute("aria-expanded", "true");
+      pointsPanelToggle.textContent = "Точки на карте";
     }
   }
 
@@ -291,6 +311,10 @@
     clampCenter();
     measure();
     renderBase();
+    if (mainEl && mobilePointsMedia.matches) {
+      mainEl.classList.remove("main--points-open");
+      syncMobilePointsPanelUi();
+    }
   }
 
   function renderPoints() {
@@ -751,9 +775,6 @@
     (e) => {
       stopInertia();
       lastPivot = mapPivotFromClient(e.clientX, e.clientY);
-      if (e.ctrlKey) {
-        return;
-      }
       e.preventDefault();
       wheelAccum += e.deltaY;
       scheduleWheelFlush();
@@ -765,7 +786,7 @@
     lastCursorClient = { x: e.clientX, y: e.clientY };
     refreshCursorCoordsOverlay();
     lastPivot = mapPivotFromClient(e.clientX, e.clientY);
-    if (!pointerDown) {
+    if (!pointerDown || e.pointerId !== panPointerId) {
       return;
     }
     const dx = e.clientX - dragStartClient.x;
@@ -804,7 +825,11 @@
     if (e.button !== 0) {
       return;
     }
+    if (!e.isPrimary) {
+      return;
+    }
     pointerDown = true;
+    panPointerId = e.pointerId;
     panActive = false;
     stopInertia();
     lastPanSampleTs = 0;
@@ -819,8 +844,12 @@
     if (e.button !== 0) {
       return;
     }
+    if (e.pointerId !== panPointerId) {
+      return;
+    }
     const shouldStartInertia = panActive;
     pointerDown = false;
+    panPointerId = -1;
     panActive = false;
     lastPanSampleTs = 0;
     mapEl.classList.remove("is-dragging", "is-pan-press");
@@ -836,10 +865,26 @@
 
   mapEl.addEventListener("pointercancel", () => {
     pointerDown = false;
+    panPointerId = -1;
     panActive = false;
     lastPanSampleTs = 0;
     stopInertia();
     mapEl.classList.remove("is-dragging", "is-pan-press");
+  });
+
+  pointsPanelToggle?.addEventListener("click", () => {
+    if (!mainEl || !mobilePointsMedia.matches) {
+      return;
+    }
+    mainEl.classList.toggle("main--points-open");
+    syncMobilePointsPanelUi();
+  });
+
+  mobilePointsMedia.addEventListener("change", () => {
+    syncMobilePointsPanelUi();
+    if (!zTransition) {
+      renderBase();
+    }
   });
 
   function zoomByButton(dir) {
@@ -872,6 +917,7 @@
   });
 
   window.addEventListener("resize", () => {
+    syncMobilePointsPanelUi();
     if (!zTransition) {
       renderBase();
     }
@@ -915,8 +961,10 @@
   generateRandomPoints();
   measure();
   renderBase();
+  syncMobilePointsPanelUi();
 
   window.addEventListener("load", () => {
+    syncMobilePointsPanelUi();
     renderBase();
   });
 })();
