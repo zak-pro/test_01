@@ -10,6 +10,9 @@
   const INERTIA_DECAY_PER_FRAME = 0.92;
   const INERTIA_MIN_SPEED = 0.02;
   const INERTIA_STRENGTH = 0.5;
+  const CENTER_FLY_MIN_MS = 320;
+  const CENTER_FLY_MAX_MS = 880;
+  const CENTER_FLY_MS_PER_WORLD_PX = 0.55;
 
   const mapEl = document.getElementById("map");
   const tilesBaseEl = document.getElementById("tilesBase");
@@ -61,6 +64,9 @@
   let inertiaVy = 0;
   let inertiaRaf = 0;
   let inertiaLastTs = 0;
+
+  let centerFlyRaf = 0;
+  let centerFlyGeneration = 0;
 
   let wheelAccum = 0;
   let wheelRaf = 0;
@@ -326,18 +332,67 @@
     if (zTransition || idx < 0 || idx >= points.length) {
       return;
     }
+    stopInertia();
+    stopCenterFly();
     selectedPointIndex = idx;
     const world = worldSize(z);
     const p = points[idx];
-    center.x = p.nx * world;
-    center.y = p.ny * world;
-    clampCenter();
-    measure();
-    renderBase();
+    const targetX = Math.max(0, Math.min(world, p.nx * world));
+    const targetY = Math.max(0, Math.min(world, p.ny * world));
+    const startX = center.x;
+    const startY = center.y;
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+
     if (mainEl && mobilePointsMedia.matches) {
       mainEl.classList.remove("main--points-open");
       syncMobilePointsPanelUi();
     }
+
+    if (Math.hypot(dx, dy) < 1.5) {
+      center.x = targetX;
+      center.y = targetY;
+      clampCenter();
+      measure();
+      renderBase();
+      return;
+    }
+
+    const flyGen = centerFlyGeneration;
+    const duration = Math.min(
+      CENTER_FLY_MAX_MS,
+      Math.max(CENTER_FLY_MIN_MS, Math.hypot(dx, dy) * CENTER_FLY_MS_PER_WORLD_PX)
+    );
+    const t0 = performance.now();
+    const easeOutCubic = (t) => 1 - (1 - t) ** 3;
+
+    function flyStep(now) {
+      if (flyGen !== centerFlyGeneration) {
+        centerFlyRaf = 0;
+        return;
+      }
+      if (zTransition) {
+        centerFlyRaf = 0;
+        return;
+      }
+      const u = Math.min(1, (now - t0) / duration);
+      const e = easeOutCubic(u);
+      center.x = startX + dx * e;
+      center.y = startY + dy * e;
+      clampCenter();
+      renderCurrentView();
+      if (u < 1) {
+        centerFlyRaf = requestAnimationFrame(flyStep);
+      } else {
+        center.x = targetX;
+        center.y = targetY;
+        clampCenter();
+        centerFlyRaf = 0;
+        renderBase();
+      }
+    }
+
+    centerFlyRaf = requestAnimationFrame(flyStep);
   }
 
   function renderPoints() {
@@ -574,6 +629,14 @@
     inertiaVy = 0;
   }
 
+  function stopCenterFly() {
+    centerFlyGeneration += 1;
+    if (centerFlyRaf) {
+      cancelAnimationFrame(centerFlyRaf);
+      centerFlyRaf = 0;
+    }
+  }
+
   function startInertia() {
     if (zTransition) {
       return;
@@ -648,6 +711,7 @@
       return;
     }
 
+    stopCenterFly();
     zTransition = true;
     clearWheelQueue();
     transitionToken += 1;
@@ -804,6 +868,7 @@
     "wheel",
     (e) => {
       stopInertia();
+      stopCenterFly();
       lastPivot = mapPivotFromClient(e.clientX, e.clientY);
       e.preventDefault();
       wheelAccum += e.deltaY;
@@ -852,6 +917,7 @@
       }
       e.preventDefault();
       stopInertia();
+      stopCenterFly();
       if (!pinchActive) {
         pinchActive = true;
         pinchLastDist = dist;
@@ -952,6 +1018,7 @@
     if (!e.isPrimary) {
       return;
     }
+    stopCenterFly();
     pointerDown = true;
     panPointerId = e.pointerId;
     panActive = false;
@@ -1022,6 +1089,7 @@
     if (zTransition) {
       return;
     }
+    stopCenterFly();
     measure();
     const px = lastPivot.x;
     const py = lastPivot.y;
@@ -1035,6 +1103,7 @@
   resetBtn.addEventListener("click", () => {
     transitionToken += 1;
     stopInertia();
+    stopCenterFly();
     clearOutTierCooldown();
     clearWheelQueue();
     zTransition = false;
